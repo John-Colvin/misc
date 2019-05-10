@@ -186,37 +186,48 @@ unittest
 
 auto until(alias foo, R)(R r)
 {
-	return IterState!(R, ElementType!R,
-	(s)
-	{
-    	if (s.input.empty)
-			return s.stop;
-		s.input.popFront();
-		if (s.input.empty || pred(s.input.front))
-			return s.stop;
-		return s.val(s.input.front);
+    import std.range : ElementType, empty, front, popFront;
+
+    return IterState!(R, ElementType!R,
+    (s)
+    {
+        if (s.input.empty || foo(s.input.front))
+            return s.stop;
+        return s.val(s.input.front)
+        	.popInput;
+    })(r);
 }
 
 unittest
 {
     import std.algorithm : equal;
     import std.typecons : tuple, Tuple;
+    import std.range : take;
 
     int[] empty = [];
     assert([1,2,3,4].until!(x => x == 3).equal([1, 2]));
     assert(empty.until!(x => 4).equal(empty));
 }
+
+
+
 /+
 auto chunkBy(alias foo = (a, b) => a == b, R)(R r)
 {
-	return IterState!(R, /*something*/,
-	(s)
-	{
-		if (s.input.empty)
-			return s.stop;
-		auto inFront = s.input.front;
-		return s.val(s.input.until!(x => !foo(inFront, x)));
-	}
+    static auto ret(R r, ElementType!R v)
+    {
+		return r.until!(x => !foo(v, x);
+    }
+
+    return IterState!(R, ReturnType!ret,
+    (s)
+    {
+        typeof(s.input.front) inFront;
+        if (s.input.empty)
+            return s.stop;
+        inFront = s.input.front;
+        return s.val();
+    }
 }
 
 unittest
@@ -224,3 +235,4 @@ unittest
 
 }
 +/
+
