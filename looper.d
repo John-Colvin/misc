@@ -40,19 +40,6 @@ struct betterGen(Input, ResEl, alias step)
         r.nothingAvailable = true;
         return r;
     }
-
-    typeof(this) apply(alias f)()
-    {
-        auto r = this;
-        f(r);
-        return r;
-    }
-}
-
-auto modify(alias f, T)(T t)
-{
-    f(t);
-    return t;
 }
 
 auto popInput(S)(S s)

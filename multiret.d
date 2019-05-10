@@ -25,10 +25,7 @@ if (allSatisfy!(isCallable, typeof(handlers))
 unittest
 {
 	import std.stdio;
-	static struct Err
-	{
-		string msg;
-	}
+	static struct Err { string msg; }
 	foreach (x; [-1, 1])
 		multiRet!(
     			(int x) => x.writeln,
