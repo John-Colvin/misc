@@ -1,6 +1,4 @@
-import std.stdio;
-
-struct IterState(Input, ResEl, alias step)
+struct betterGen(Input, ResEl, alias step)
 {
     Input input;
 
@@ -16,7 +14,6 @@ struct IterState(Input, ResEl, alias step)
 
     void popFront()
     {
-        debug(IterState) writeln("popFront");
         nothingAvailable = true;
         while (!empty && nothingAvailable)
             this = step(this);
@@ -24,7 +21,6 @@ struct IterState(Input, ResEl, alias step)
 
     typeof(this) stop()
     {
-        debug (IterState) writeln("stop");
         auto r = this;
         r.empty = true;
         return r;
@@ -32,7 +28,6 @@ struct IterState(Input, ResEl, alias step)
 
     typeof(this) val(ResEl v)
     {
-        debug (IterState) writeln("val");
         auto r = this;
         r.front = v;
         r.nothingAvailable = false;
@@ -41,7 +36,6 @@ struct IterState(Input, ResEl, alias step)
 
     typeof(this) nothing() @property
     {
-        debug (IterState) writeln("nothing");
         auto r = this;
         r.nothingAvailable = true;
         return r;
@@ -52,13 +46,6 @@ struct IterState(Input, ResEl, alias step)
         auto r = this;
         f(r);
         return r;
-    }
-
-    string debugString()
-    {
-        import std.conv;
-        import std.range : save;
-        return text(input.save, ' ', front, ' ', empty, ' ', nothingAvailable);
     }
 }
 
@@ -80,19 +67,18 @@ auto filter(alias foo, R)(R r)
     import std.range : ElementType;
     import std.range : empty, popFront, front;
 
-    return IterState!(R, ElementType!R,
-    (s)
+    return r.betterGen!(R, ElementType!R,
+    (s) { with (s)
     {
-        debug (IterState) writeln("calling step with ", s.debugString);
-        if (s.input.empty)
-            return s.stop;
-        auto inFront = s.input.front;
+        if (input.empty)
+            return stop;
+        auto inFront = input.front;
         if (foo(inFront))
-            return s.val(inFront)
+            return val(inFront)
                 .popInput();
-        return s.nothing
+        return nothing
             .popInput;
-    })(r);
+    }});
 }
 
 unittest
@@ -103,18 +89,28 @@ unittest
     assert(empty.filter!(x => x == 2).equal(empty));
 }
 
+@nogc unittest
+{
+    import std.algorithm : equal;
+    import std.range : iota, only;
+
+    int[] empty;
+    assert(iota(4).filter!(x => x == 2).equal(only(2)));
+    assert(empty.filter!(x => x == 2).equal(empty));
+}
+
 auto map(alias foo, R)(R r)
 {
     import std.range : ElementType, front, empty;
 
-    return IterState!(R, typeof(foo(ElementType!R.init)),
-    (s)
+    return r.betterGen!(R, typeof(foo(ElementType!R.init)),
+    (s) { with (s)
     {
-        if (s.input.empty)
-            return s.stop;
-        return s.val(foo(s.input.front))
+        if (input.empty)
+            return stop;
+        return val(foo(input.front))
             .popInput;
-    })(r);
+    }});
 }
 
 unittest
@@ -122,25 +118,25 @@ unittest
     import std.algorithm : equal;
     int[] empty = [];
     assert([1,2,3,4].map!(x => x == 2).equal([false, true, false, false]));
-    assert(empty.filter!(x => x == 2).equal(empty));
+    assert(empty.map!(x => x == 2).equal(empty));
 }
 
 auto uniq(alias foo = (a, b) => a == b, R)(R r)
 {
     import std.range : ElementType, front, popFront, empty;
 
-    return IterState!(R, ElementType!R,
-    (s)
+    return r.betterGen!(R, ElementType!R,
+    (s) { with (s)
     {
-        if (s.input.empty)
-            return s.stop;
-        auto inFront = s.input.front;
+        if (input.empty)
+            return stop;
+        auto inFront = input.front;
         do
-            s.input.popFront();
-        while (!s.input.empty && foo(s.input.front, inFront));
+            input.popFront();
+        while (!input.empty && foo(input.front, inFront));
 
-        return s.val(inFront);
-    })(r);
+        return val(inFront);
+    }});
 }
 
 unittest
@@ -156,21 +152,21 @@ auto group(alias foo = (a, b) => a == b, R)(R r)
     import std.range : ElementType, front, popFront, empty;
     import std.typecons : Tuple, tuple;
 
-    return IterState!(R, Tuple!(ElementType!R, size_t),
-    (s)
+    return r.betterGen!(R, Tuple!(ElementType!R, size_t),
+    (s) { with (s)
     {
-        if (s.input.empty)
-            return s.stop;
-        auto inFront = s.input.front;
+        if (input.empty)
+            return stop;
+        auto inFront = input.front;
         size_t n = 0;
         do
         {
-            s.input.popFront();
+            input.popFront();
             ++n;
-        } while (!s.input.empty && foo(s.input.front, inFront));
+        } while (!input.empty && foo(input.front, inFront));
 
-        return s.val(tuple(inFront, n));
-    })(r);
+        return val(tuple(inFront, n));
+    }});
 }
 
 unittest
@@ -188,14 +184,14 @@ auto until(alias foo, R)(R r)
 {
     import std.range : ElementType, empty, front, popFront;
 
-    return IterState!(R, ElementType!R,
-    (s)
+    return r.betterGen!(R, ElementType!R,
+    (s) { with (s)
     {
-        if (s.input.empty || foo(s.input.front))
-            return s.stop;
-        return s.val(s.input.front)
-        	.popInput;
-    })(r);
+        if (input.empty || foo(input.front))
+            return stop;
+        return val(input.front)
+            .popInput;
+    }});
 }
 
 unittest
@@ -209,17 +205,15 @@ unittest
     assert(empty.until!(x => 4).equal(empty));
 }
 
-
-
 /+
 auto chunkBy(alias foo = (a, b) => a == b, R)(R r)
 {
     static auto ret(R r, ElementType!R v)
     {
-		return r.until!(x => !foo(v, x);
+        return r.until!(x => !foo(v, x);
     }
 
-    return IterState!(R, ReturnType!ret,
+    return betterGen!(R, ReturnType!ret,
     (s)
     {
         typeof(s.input.front) inFront;
